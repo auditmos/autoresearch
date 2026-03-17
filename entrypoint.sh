@@ -52,9 +52,9 @@ if [ "$1" = "agent" ]; then
         printf 'commit\tscore\tsharpe\tmax_dd\tstatus\tdescription\n' > results.tsv
     fi
 
-    # Launch claude in tmux session
-    exec tmux new-session -s autoquant \
-        "claude --dangerously-skip-permissions 'Read program.md and start experimenting.'"
+    # Launch claude (-p skips theme picker, works headless)
+    exec claude -p --dangerously-skip-permissions \
+        "Read program.md and start experimenting. NEVER STOP."
 fi
 
 # Default: run script
