@@ -34,6 +34,7 @@ if [ "$1" = "agent" ]; then
     fi
 
     # Git init if needed
+    git config --global --add safe.directory /app
     if [ ! -d .git ]; then
         git config --global user.email "researcher@autoquant"
         git config --global user.name "researcher"
