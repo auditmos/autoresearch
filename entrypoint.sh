@@ -66,7 +66,9 @@ if [ "$1" = "agent" ]; then
     fi
 
     # Launch claude (-p skips theme picker, works headless)
-    exec claude -p --dangerously-skip-permissions \
+    MODEL_FLAG=""
+    [ -n "$CLAUDE_MODEL" ] && MODEL_FLAG="--model $CLAUDE_MODEL"
+    exec claude -p --dangerously-skip-permissions $MODEL_FLAG \
         "Read program.md and start experimenting. NEVER STOP."
 fi
 
