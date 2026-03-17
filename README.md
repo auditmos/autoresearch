@@ -22,14 +22,36 @@ Same agent pattern as [karpathy/autoresearch](https://github.com/karpathy/autore
 - Claude subscription (for autonomous agent mode)
 - Alpha Vantage API key (premium recommended)
 
+## Secrets setup
+
+### Alpha Vantage API key
+
+Get one at https://www.alphavantage.co/support/#api-key (premium recommended for no rate limits).
+
+### Telegram bot + chat ID
+
+1. Message `@BotFather` on Telegram → `/newbot` → pick name/username → copy the token
+2. Add your bot to the channel/group as admin
+3. Send a message in the channel
+4. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` — find `"chat":{"id":-100xxxxxxxxxx}`
+5. That negative number is your `TELEGRAM_CHAT_ID`
+
+### GitHub personal access token
+
+1. https://github.com/settings/tokens → "Generate new token" → **Fine-grained token**
+2. Resource owner: your org/account
+3. Repository access: select the target repo
+4. Permissions: **Contents** → Read and write
+5. Generate → copy the `github_pat_...` token
+
 ## Quick start
 
 ```bash
 # .env file
 ALPHA_VANTAGE_API_KEY=your_key_here
-TELEGRAM_BOT_TOKEN=your_bot_token          # optional
-TELEGRAM_CHAT_ID=your_chat_id              # optional
-GIT_REMOTE_URL=https://<token>@github.com/auditmos/autoquant.git  # optional
+TELEGRAM_BOT_TOKEN=your_bot_token                                  # optional
+TELEGRAM_CHAT_ID=your_chat_id                                      # optional
+GIT_REMOTE_URL=https://github_pat_xxxxx@github.com/org/repo.git    # optional
 
 # Build
 docker compose build
