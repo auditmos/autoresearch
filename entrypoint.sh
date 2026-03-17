@@ -37,6 +37,8 @@ if [ "$1" = "agent" ]; then
     git config --global --add safe.directory /app
     git config --global user.email "researcher@autoquant"
     git config --global user.name "researcher"
+    cp /app/hooks/pre-commit /app/.git/hooks/pre-commit 2>/dev/null || true
+    chmod +x /app/.git/hooks/pre-commit 2>/dev/null || true
 
     if [ ! -d .git ]; then
         # Try to clone from remote (resume previous experiments)

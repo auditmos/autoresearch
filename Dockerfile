@@ -26,6 +26,7 @@ RUN uv sync
 
 # Application code (changes more often → separate layer)
 COPY --chown=researcher:researcher prepare.py strategy.py program.md notify.sh ./
+COPY --chown=researcher:researcher hooks/ ./hooks/
 RUN chmod +x notify.sh
 
 # Claude Code CLI
