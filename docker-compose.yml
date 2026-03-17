@@ -1,7 +1,6 @@
 services:
   autoquant:
     build: .
-    user: researcher
     runtime: nvidia
     deploy:
       resources:

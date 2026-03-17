@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Fix bind mount permissions (starts as root), then re-exec as researcher
+if [ "$(id -u)" = "0" ]; then
+    mkdir -p /home/researcher/.cache/autoquant/data
+    chown researcher:researcher /home/researcher/.cache/autoquant/data
+    chown researcher:researcher /app
+    exec runuser -u researcher -- "$0" "$@"
+fi
+
+# Everything below runs as researcher
 CACHE_DIR="/home/researcher/.cache/autoquant"
 DATA_DIR="$CACHE_DIR/data"
 
@@ -9,12 +18,12 @@ if [ "$1" = "login" ]; then
     exec claude login
 fi
 
-# Agent mode: prepare data, init git, launch claude in tmux
+# Agent mode
 if [ "$1" = "agent" ]; then
     echo "=== Autoquant agent mode ==="
 
     # Download AV data if not cached
-    if [ ! -d "$DATA_DIR" ] || [ -z "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+    if [ -z "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
         if [ -z "$ALPHA_VANTAGE_API_KEY" ]; then
             echo "Error: ALPHA_VANTAGE_API_KEY required for first run (data not cached)"
             exit 1
