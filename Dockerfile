@@ -38,7 +38,7 @@ RUN su - researcher -c 'curl -fsSL https://claude.ai/install.sh | bash' 2>/dev/n
 ENV PATH="/home/researcher/.local/bin:$PATH"
 
 COPY entrypoint.sh ./
-RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh && chown -R researcher:researcher /app
 
 VOLUME /home/researcher/.cache/autoquant
 
