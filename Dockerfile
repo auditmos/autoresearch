@@ -8,37 +8,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates bash tmux \
     && rm -rf /var/lib/apt/lists/*
 
-# uv (manages Python + deps)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:$PATH"
+# Non-root user (required by claude --dangerously-skip-permissions)
+RUN useradd -m -s /bin/bash researcher
+
+# uv for researcher
+RUN su - researcher -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 
 WORKDIR /app
+RUN chown researcher:researcher /app
 
-# Project files
-COPY pyproject.toml .python-version ./
+USER researcher
+ENV PATH="/home/researcher/.local/bin:$PATH"
 
-# Install Python deps (uv downloads Python 3.10 + all packages)
-# torch cu128 wheel is ~2.5GB, cached in Docker layer
+# Project files + install deps as researcher (symlinks point to researcher's Python)
+COPY --chown=researcher:researcher pyproject.toml .python-version ./
 RUN uv sync
 
 # Application code (changes more often → separate layer)
-COPY prepare.py strategy.py program.md ./
-COPY notify.sh ./
+COPY --chown=researcher:researcher prepare.py strategy.py program.md notify.sh ./
 RUN chmod +x notify.sh
 
-# Non-root user (required by claude --dangerously-skip-permissions)
-RUN useradd -m -s /bin/bash researcher \
-    && cp -r /root/.local /home/researcher/.local \
-    && mkdir -p /home/researcher/.cache/autoquant \
-    && chown -R researcher:researcher /app /home/researcher
-
 # Claude Code CLI
-RUN su - researcher -c 'curl -fsSL https://claude.ai/install.sh | bash' 2>/dev/null || true
+RUN curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || true
 
-ENV PATH="/home/researcher/.local/bin:$PATH"
-
+# Entrypoint (needs root for chmod)
+USER root
 COPY entrypoint.sh ./
-RUN chmod +x entrypoint.sh && chown -R researcher:researcher /app
+RUN chmod +x entrypoint.sh && chown researcher:researcher entrypoint.sh
+RUN mkdir -p /home/researcher/.cache/autoquant \
+    && chown -R researcher:researcher /home/researcher/.cache/autoquant
 
 VOLUME /home/researcher/.cache/autoquant
 
