@@ -35,6 +35,7 @@ The original autoresearch requires an H100 (80GB) and runs bare-metal. This fork
 
 - NVIDIA GPU with 12GB+ VRAM (tested: RTX 5070)
 - Docker with NVIDIA runtime (`nvidia-container-toolkit`)
+- Claude subscription (for autonomous agent mode)
 - ~5GB disk for data shards + tokenizer
 
 ### Docker + NVIDIA runtime setup
@@ -56,34 +57,79 @@ docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 ## Quick start
 
 ```bash
+git clone https://github.com/auditmos/autoresearch.git
+cd autoresearch
+
 # Build (first time ~15 min: PyTorch 2.5GB + Rust compiler)
 docker compose build
 
-# Run (first time: downloads ~5GB data + trains tokenizer, then 10 min training)
+# Single training run (first time: downloads ~5GB data + trains tokenizer, then 10 min training)
 docker compose up
-
 # Output: val_bpb score (lower = better)
 ```
 
-## Running the autonomous agent
+## Autonomous agent mode
+
+Claude Code runs inside the container, autonomously modifying `train.py`, training, evaluating, and keeping/discarding changes. ~50 experiments overnight.
 
 ```bash
-# Enter container interactively
-docker compose run --entrypoint bash autoresearch
+# 1. Authenticate Claude (one-time, persists in Docker volume)
+docker compose run autoresearch login
+#    Copy the URL → open in your browser → log in with your subscription
 
-# Inside container:
-git init && git add -A && git commit -m "baseline"
-git checkout -b autoresearch/experiment1
-
-# Init results tracking
-printf 'commit\tval_bpb\tmemory_gb\tstatus\tdescription\n' > results.tsv
-
-# Install and run Claude Code (or any AI coding agent)
-curl -fsSL https://claude.ai/install.sh | sh
-claude --dangerously-skip-permissions "Read program.md and start experimenting"
+# 2. Launch the agent
+docker compose run autoresearch agent
+#    Agent reads program.md, starts experiment loop, runs indefinitely
 ```
 
-The agent will autonomously modify `train.py`, run 10-min experiments, evaluate results, and keep/discard changes. ~50 experiments overnight.
+### Monitoring progress
+
+While the agent is running, open a second terminal:
+
+```bash
+# Find the running container
+docker ps
+# CONTAINER ID   IMAGE                              STATUS
+# a1b2c3d4e5f6   autoresearch-autoresearch          Up 2 hours
+
+# --- Results table (main overview) ---
+docker exec -it <container_id> cat results.tsv
+# commit   val_bpb    memory_gb  status   description
+# baseline 1.104000   6.2        keep     baseline DEPTH=8 10min
+# a1b2c3d  1.098500   6.3        keep     increase MATRIX_LR to 0.06
+# b2c3d4e  1.102000   6.2        discard  switch to GeLU activation
+# ...
+
+# --- Live training output ---
+docker exec -it <container_id> tail -f run.log
+# step 00234 (43.2%) | loss: 3.15 | lrm: 1.00 | ...
+
+# --- Git log (kept experiments) ---
+docker exec -it <container_id> git log --oneline
+# b2c3d4e increase MATRIX_LR to 0.06
+# a1b2c3d baseline val_bpb=1.104
+
+# --- GPU utilization ---
+nvidia-smi
+
+# --- Current train.py diff vs baseline ---
+docker exec -it <container_id> git diff HEAD~1
+
+# --- Quick summary: best result so far ---
+docker exec -it <container_id> sort -t$'\t' -k2 -n results.tsv | head -3
+```
+
+### Stopping and resuming
+
+```bash
+# Stop: Ctrl+C or from another terminal:
+docker stop <container_id>
+
+# Resume: agent picks up from last git state
+docker compose run autoresearch agent
+```
+
+The git history and results.tsv persist inside the container. Claude auth persists in the `claude-config` Docker volume.
 
 ## Adapting for other GPUs
 
