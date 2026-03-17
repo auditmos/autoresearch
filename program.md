@@ -1,70 +1,61 @@
-# autoresearch — RTX 5070 12GB
+# Autoquant — autonomous trading strategy optimizer
 
-Autonomous ML research agent. You modify `train.py`, run experiments, keep improvements, discard regressions.
-
-## Hardware
-
-- GPU: RTX 5070 12GB VRAM (Blackwell, sm_120)
-- Attention: PyTorch SDPA (FA3 doesn't work on Blackwell)
-- DEVICE_BATCH_SIZE=32 max (64 OOM'd)
-- TOTAL_BATCH_SIZE must be divisible by 32*1024=32768
-- Peak VRAM so far: 6.2GB — there's headroom
-
-## Setup
-
-1. Branch: `git checkout -b autoresearch/<tag>`
-2. Read: `prepare.py` (fixed), `train.py` (you modify)
-3. Verify data: `ls ~/.cache/autoresearch/tokenizer/`
-4. Init results: create `results.tsv` with header
-5. Confirm and go
+You modify `strategy.py`, run backtests, keep improvements, discard regressions. Loop forever.
 
 ## Rules
 
-**CAN:** modify `train.py` — architecture, optimizer, hyperparams, batch size, everything.
+**CAN:** modify `strategy.py` — signals, indicators, filters, ML models, everything.
 
-**CANNOT:** modify `prepare.py`, add packages, change evaluation.
+**CANNOT:** modify `prepare.py`, add packages, change backtest/scoring logic.
 
-**Metric:** `val_bpb` (lower = better). Extract: `grep "^val_bpb:" run.log`
+**Metric:** `score` (higher = better). Extract: `grep "^score:" run.log`
 
-**VRAM soft limit:** 12GB. Current usage ~6GB, so room to experiment.
+**Assets:** SPY + BTC + ETH daily candles, multi-asset averaging.
 
-## Known results on this hardware
-
-```
-commit	val_bpb	memory_gb	status	description
-baseline	1.146000	3.7	keep	DEPTH=6, BATCH=32, 5min budget
-scale_d8	1.184000	6.2	discard	DEPTH=8, BATCH=32, 5min — too few steps
-scale_d7	1.170000	4.9	discard	DEPTH=7, BATCH=32, 5min — still too few steps
-time10m	1.104000	6.2	keep	DEPTH=8, BATCH=32, 10min budget — winner
-```
-
-Current best: val_bpb=1.104 with DEPTH=8, 50M params, 10min budget.
+**Available columns:** timestamp, open, high, low, close, volume
 
 ## Experiment loop
 
 LOOP FOREVER:
 
-1. Review git state
-2. Modify `train.py` with an idea
-3. `git commit`
-4. Run: `uv run train.py > run.log 2>&1`
-5. Check: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
-6. Empty output = crash → `tail -n 50 run.log`, attempt fix
-7. Log to `results.tsv` (tab-separated): `commit | val_bpb | memory_gb | status | description`
-8. If val_bpb improved → keep commit
-9. If equal/worse → `git reset --hard HEAD~1`
+1. Read `results.tsv`. Find best score and its commit hash (`best_commit`).
+2. If last experiment was `discard`: restore best strategy:
+   `git show <best_commit>:strategy.py > strategy.py`
+3. Modify `strategy.py` with a new idea.
+4. `git add strategy.py && git commit -m "<short description>"`
+5. Run: `uv run strategy.py > run.log 2>&1`
+6. Check: `grep "^score:\|^sharpe:\|^max_drawdown:" run.log`
+   Empty output = crash → `tail -n 50 run.log`, attempt fix.
+7. Append to `results.tsv` (tab-separated):
+   `<commit_hash>\t<score>\t<sharpe>\t<max_dd>\t<status>\t<description>`
+8. If score > best → status=`keep`
+   If score ≤ best → status=`discard` (**NO git reset** — all commits stay)
+9. Push: `git push origin HEAD 2>/dev/null || echo "push failed, continuing"`
+10. Notify: `./notify.sh "<b>Autoquant #N</b>
+Status: keep ✅ / discard ❌
+Score: X.XXX (best: X.XXX)
+Sharpe: X.XX | MaxDD: -XX%
+Desc: <description>"`
+11. GOTO 1
 
-**Timeout:** each run ~12 min total (10 min train + overhead). Kill if >15 min.
+**Timeout:** each backtest ~30-60s. Kill if >2 min.
 
-**NEVER STOP.** Do not ask for permission. Run indefinitely until manually interrupted.
+**Crash handling:** `tail -n 50 run.log`, notify error, attempt fix, move on after 2-3 tries.
+
+**NEVER STOP.** Run indefinitely until manually interrupted.
 
 ## Ideas to explore
 
-- GQA (n_kv_head < n_head) — reduce value_embed overhead
-- SwiGLU activation instead of ReLU²
-- Different LR schedules (warmup, cosine)
-- Muon hyperparams (momentum, ns_steps)
-- Weight tying (wte = lm_head)
-- Layer scaling strategies
-- Batch size vs model depth tradeoff
-- Remove or reduce value embeddings
+- RSI overbought/oversold filters
+- MACD signal line crossover
+- Bollinger Band breakout / mean reversion
+- ATR-based stop losses and position sizing
+- Volume-weighted signals
+- Momentum (ROC, Williams %R)
+- Multi-timeframe (weekly + daily)
+- Regime detection (volatility-based switching)
+- Ensemble voting (combine multiple signals)
+- Neural signals (torch GPU — small MLP on features)
+- Trend strength filters (ADX)
+- Seasonal / day-of-week patterns
+- Mean reversion vs momentum regime switching

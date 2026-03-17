@@ -9,3 +9,5 @@ run.log
 *.pkl
 .cache/
 worktrees/
+data/
+.env

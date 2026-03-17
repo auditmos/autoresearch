@@ -1,41 +1,52 @@
 #!/bin/bash
 set -e
 
-CACHE_DIR="/home/researcher/.cache/autoresearch"
+CACHE_DIR="/home/researcher/.cache/autoquant"
+DATA_DIR="$CACHE_DIR/data"
 
-# Auto-prepare data + tokenizer on first run
-if [ ! -d "$CACHE_DIR/tokenizer" ]; then
-    echo "=== First run: downloading data shards + training tokenizer ==="
-    uv run prepare.py --num-shards 8
-    echo "=== Data ready ==="
-fi
-
-# Login mode: authenticate claude with subscription
+# Login mode
 if [ "$1" = "login" ]; then
     exec claude login
 fi
 
-# Agent mode: init git, setup results.tsv, launch claude
+# Agent mode: prepare data, init git, launch claude in tmux
 if [ "$1" = "agent" ]; then
-    echo "=== Agent mode ==="
+    echo "=== Autoquant agent mode ==="
+
+    # Download AV data if not cached
+    if [ ! -d "$DATA_DIR" ] || [ -z "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
+        if [ -z "$ALPHA_VANTAGE_API_KEY" ]; then
+            echo "Error: ALPHA_VANTAGE_API_KEY required for first run (data not cached)"
+            exit 1
+        fi
+        echo "=== Downloading market data ==="
+        uv run prepare.py
+        echo "=== Data ready ==="
+    fi
 
     # Git init if needed
     if [ ! -d .git ]; then
-        git config --global user.email "researcher@autoresearch"
+        git config --global user.email "researcher@autoquant"
         git config --global user.name "researcher"
-        git init && git add -A && git commit -m "baseline val_bpb=1.104"
-        git checkout -b autoresearch/experiment
+        git init && git add -A && git commit -m "autoquant baseline"
+        git checkout -b autoquant/experiment
+    fi
+
+    # Set remote if provided
+    if [ -n "$GIT_REMOTE_URL" ]; then
+        git remote remove origin 2>/dev/null || true
+        git remote add origin "$GIT_REMOTE_URL"
     fi
 
     # Results tracking
     if [ ! -f results.tsv ]; then
-        printf 'commit\tval_bpb\tmemory_gb\tstatus\tdescription\n' > results.tsv
-        printf 'baseline\t1.104000\t6.2\tkeep\tbaseline DEPTH=8 10min\n' >> results.tsv
+        printf 'commit\tscore\tsharpe\tmax_dd\tstatus\tdescription\n' > results.tsv
     fi
 
-    exec claude --dangerously-skip-permissions \
-        "Read program.md and start experimenting. Baseline: val_bpb=1.104"
+    # Launch claude in tmux session
+    exec tmux new-session -s autoquant \
+        "claude --dangerously-skip-permissions 'Read program.md and start experimenting.'"
 fi
 
-# Default: run training script
+# Default: run script
 exec uv run "$@"
