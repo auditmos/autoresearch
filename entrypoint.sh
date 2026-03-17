@@ -33,13 +33,25 @@ if [ "$1" = "agent" ]; then
         echo "=== Data ready ==="
     fi
 
-    # Git init if needed
+    # Git setup
     git config --global --add safe.directory /app
+    git config --global user.email "researcher@autoquant"
+    git config --global user.name "researcher"
+
     if [ ! -d .git ]; then
-        git config --global user.email "researcher@autoquant"
-        git config --global user.name "researcher"
-        git init && git add -A && git commit -m "autoquant baseline"
-        git checkout -b autoquant/experiment
+        # Try to clone from remote (resume previous experiments)
+        if [ -n "$GIT_REMOTE_URL" ] && git clone "$GIT_REMOTE_URL" /tmp/repo 2>/dev/null; then
+            cp -a /tmp/repo/.git /app/.git
+            git checkout autoquant/experiment 2>/dev/null || true
+            # Restore strategy.py + results.tsv from remote
+            git checkout HEAD -- strategy.py 2>/dev/null || true
+            git checkout HEAD -- results.tsv 2>/dev/null || true
+            rm -rf /tmp/repo
+            echo "=== Resumed from remote ==="
+        else
+            git init && git add -A && git commit -m "autoquant baseline"
+            git checkout -b autoquant/experiment
+        fi
     fi
 
     # Set remote if provided
