@@ -22,7 +22,7 @@ LOOP FOREVER:
 2. If last experiment was `discard`: restore best strategy:
    `git show <best_commit>:strategy.py > strategy.py`
 3. Modify `strategy.py` with a new idea.
-4. `git add strategy.py && git commit -m "<short description>"`
+4. `git add strategy.py results.tsv && git commit -m "<short description>"`
 5. Run: `uv run strategy.py > run.log 2>&1`
 6. Check: `grep "^score:\|^sharpe:\|^max_drawdown:" run.log`
    Empty output = crash → `tail -n 50 run.log`, attempt fix.
