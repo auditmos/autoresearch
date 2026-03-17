@@ -68,11 +68,15 @@ if [ "$1" = "agent" ]; then
         printf 'commit\tscore\tsharpe\tmax_dd\tstatus\tdescription\n' > results.tsv
     fi
 
-    # Launch claude (-p skips theme picker, works headless)
+    # Launch claude in loop (-p exits when done, shell restarts it)
     MODEL_FLAG=""
     [ -n "$CLAUDE_MODEL" ] && MODEL_FLAG="--model $CLAUDE_MODEL"
-    exec claude -p --dangerously-skip-permissions $MODEL_FLAG \
-        "Read program.md and start experimenting. NEVER STOP."
+    while true; do
+        claude -p --dangerously-skip-permissions $MODEL_FLAG \
+            "Read program.md, check results.tsv for best score and last experiment, continue experimenting. NEVER STOP."
+        echo "=== Claude exited, restarting in 5s ==="
+        sleep 5
+    done
 fi
 
 # Default: run script
