@@ -2,10 +2,13 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
-results.tsv
 results/
 run.log
 *.pt
 *.pkl
 .cache/
 worktrees/
+data/*
+!data/.gitkeep
+.env
+experiments/*/.env

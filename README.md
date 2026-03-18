@@ -1,147 +1,222 @@
-# autoresearch — Docker fork for consumer GPUs
+# Autoquant — autonomous trading strategy optimizer
 
-Docker-based fork of [karpathy/autoresearch](https://github.com/karpathy/autoresearch) optimized for consumer NVIDIA GPUs (RTX 5070, 12GB VRAM).
+Claude Code autonomously modifies `strategy.py`, backtests on SPY+BTC+ETH daily data, keeps improvements, discards regressions. All commits pushed for transparency. Telegram notifications after each experiment.
 
-The original autoresearch requires an H100 (80GB) and runs bare-metal. This fork packages everything in Docker with configuration tuned for 12GB VRAM GPUs.
+Same agent pattern as [karpathy/autoresearch](https://github.com/karpathy/autoresearch), applied to trading strategies instead of ML training.
 
-## Changes from upstream
+## Repository structure
 
-| Parameter | Upstream (H100) | This fork (RTX 5070) |
-|-----------|-----------------|----------------------|
-| `MAX_SEQ_LEN` | 2048 | 1024 |
-| `TIME_BUDGET` | 300s (5 min) | 600s (10 min) |
-| `EVAL_TOKENS` | 40 × 524K | 10 × 524K |
-| `DEPTH` | 8 | 8 |
-| `HEAD_DIM` | 128 | 64 |
-| `DEVICE_BATCH_SIZE` | 128 | 32 |
-| `TOTAL_BATCH_SIZE` | 2^19 | 2^18 |
-| `WINDOW_PATTERN` | SSSL | L |
-| Attention | Flash Attention 3 | PyTorch SDPA (FA3 fallback) |
+```
+autoresearch/
+├── containers/
+│   └── autoquant/          # single Docker image (CPU + GPU)
+│       ├── Dockerfile
+│       ├── docker-compose.yml
+│       ├── entrypoint.sh
+│       ├── notify.sh
+│       └── hooks/          # pre/post-commit git hooks
+│
+├── experiments/            # experiment configs — one folder per variant
+│   ├── .env.example        # template — copy to each experiment folder
+│   ├── cpu-ta/             # CPU strategies (SMA, indicators, pandas/numpy)
+│   │   ├── strategy.py
+│   │   ├── prepare.py
+│   │   ├── live_signals.py # daily signal monitor (see Live signals section)
+│   │   ├── program.md
+│   │   ├── pyproject.toml
+│   │   ├── .python-version
+│   │   └── .env            # gitignored — keys + GIT_REMOTE_URL for this experiment
+│   └── gpu-ta/             # GPU strategies (LSTM, PyTorch, CUDA)
+│       ├── strategy.py
+│       ├── prepare.py
+│       ├── program.md
+│       ├── pyproject.toml
+│       ├── .python-version
+│       └── .env            # gitignored — keys + GIT_REMOTE_URL for this experiment
+│
+├── data/                   # shared market data (SPY, BTC, ETH) — gitignored
+│                           # downloaded once from Alpha Vantage, reused by all experiments
+└── README.md
+```
 
-**Why 10 min instead of 5?** On RTX 5070, the 50M param model needs ~540 steps to converge. At 5 min it only gets ~275 steps (undertrained). 10 min gives ~540 steps and 141M tokens — matching the tokens/params ratio of the H100 baseline.
+**One image, swappable experiments.** The `EXPERIMENT` env var tells the container which folder to load. Experiment files are mounted read-only at `/experiment` — the container copies them to `/app` at startup and runs `uv sync` (fast: uv cache is a named Docker volume).
 
-**Why SDPA?** Flash Attention 3 compiled kernels don't support Blackwell (sm_120). PyTorch's `scaled_dot_product_attention` uses efficient backends automatically. GQA is supported via `repeat_interleave`.
+## Who edits what
 
-## Baseline results
+| File | Who | Role |
+|------|-----|------|
+| `experiments/*/program.md` | **user** | defines the task — goal, constraints, what to try, what to avoid |
+| `experiments/*/strategy.py` | **agent** | trading logic — modified every experiment iteration |
+| `experiments/*/prepare.py` | **user** | read-only for agent — data loading, backtest engine, scoring |
+| `experiments/*/pyproject.toml` | **user** | Python dependencies |
+| `experiments/*/.env` | **user** | secrets + config per experiment |
+| `containers/autoquant/` | **user** | Docker infrastructure — rarely changes |
 
-| DEPTH | params | TIME | steps | tokens | val_bpb | VRAM |
-|-------|--------|------|-------|--------|---------|------|
-| 6 | 26M | 5 min | 987 | 129M | 1.146 | 3.7GB |
-| 8 | 50M | 5 min | 275 | 72M | 1.184 | 6.2GB |
-| 7 | 39M | 5 min | 350 | 92M | 1.170 | 4.9GB |
-| **8** | **50M** | **10 min** | **539** | **141M** | **1.104** | **6.2GB** |
+**Metric:** `score` (higher=better) — composite of Sharpe, Sortino, drawdown, return, win rate, with overfitting prevention (train/val/holdout splits, consistency penalty).
 
 ## Requirements
 
-- NVIDIA GPU with 12GB+ VRAM (tested: RTX 5070)
-- Docker with NVIDIA runtime (`nvidia-container-toolkit`)
-- Claude subscription (for autonomous agent mode)
-- ~5GB disk for data shards + tokenizer
+- NVIDIA GPU + `nvidia-container-toolkit` (required for gpu-ta, optional for cpu-ta)
+- Docker
+- Claude subscription
+- Alpha Vantage API key (premium recommended)
 
-### Docker + NVIDIA runtime setup
+## Secrets setup
+
+### Alpha Vantage API key
+
+Get one at https://www.alphavantage.co/support/#api-key (premium recommended for no rate limits).
+
+### Telegram bot + chat ID
+
+1. Message `@BotFather` on Telegram → `/newbot` → pick name/username → copy the token
+2. Add your bot to the channel/group as admin
+3. Send a message in the channel
+4. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` — find `"chat":{"id":-100xxxxxxxxxx}`
+5. That negative number is your `TELEGRAM_CHAT_ID`
+
+### GitHub personal access token
+
+1. https://github.com/settings/tokens → "Generate new token" → **Fine-grained token**
+2. Resource owner: your org/account
+3. Repository access: select the target repo
+4. Permissions: **Contents** → Read and write
+5. Generate → copy the `github_pat_...` token
+
+## Upload to VPS via scp
+
+If you prefer scp over git clone (e.g. VPS has no GitHub access):
 
 ```bash
-# If using Docker 29+ with containerd v2, downgrade (nvidia-ctk incompatibility):
-sudo apt install -y --allow-downgrades \
-  docker-ce=5:27.5.1-1~ubuntu.24.04~noble \
-  docker-ce-cli=5:27.5.1-1~ubuntu.24.04~noble \
-  containerd.io=1.7.29-1~ubuntu.24.04~noble
+# Upload entire repo (excludes data/ and .env files — add locally on VPS)
+scp -r autoresearch/ user@vps-host:~/
 
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
+# Or upload only what changed (experiment files)
+scp experiments/cpu-ta/{strategy.py,prepare.py,program.md,pyproject.toml,.python-version} \
+    user@vps-host:~/autoresearch/experiments/cpu-ta/
 
-# Verify
-docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
+# Upload .env separately (never commit secrets)
+scp experiments/cpu-ta/.env user@vps-host:~/autoresearch/experiments/cpu-ta/.env
 ```
 
-## Quick start
+> **Tip:** Use `rsync` for incremental syncs after initial upload:
+> ```bash
+> rsync -av --exclude='data/' --exclude='**/.env' --exclude='**/__pycache__' \
+>     autoresearch/ user@vps-host:~/autoresearch/
+> ```
+
+## VPS setup
 
 ```bash
+# 1. Clone repo
 git clone https://github.com/auditmos/autoresearch.git
 cd autoresearch
 
-# Build (first time ~15 min: PyTorch 2.5GB + Rust compiler)
+# 2. Create .env per experiment
+cp experiments/.env.example experiments/cpu-ta/.env
+cp experiments/.env.example experiments/gpu-ta/.env
+# edit each .env — fill in keys, set correct EXPERIMENT and GIT_REMOTE_URL
+
+# 3. Build image (once)
+cd containers/autoquant
 docker compose build
 
-# Single training run (first time: downloads ~5GB data + trains tokenizer, then 10 min training)
-docker compose up
-# Output: val_bpb score (lower = better)
+# 4. Authenticate Claude — once per experiment (each has its own claude-config volume)
+docker compose -p cpu-ta --env-file ../../experiments/cpu-ta/.env run autoquant login
+docker compose -p gpu-ta --env-file ../../experiments/gpu-ta/.env run autoquant login
 ```
 
-## Autonomous agent mode
+## Running experiments
 
-Claude Code runs inside the container, autonomously modifying `train.py`, training, evaluating, and keeping/discarding changes. ~50 experiments overnight.
+All commands from `containers/autoquant/`. Use `-p <name>` + `--env-file` to run experiments independently and simultaneously.
 
 ```bash
-# 1. Authenticate Claude (one-time, persists in Docker volume)
-docker compose run autoresearch login
-#    Copy the URL → open in your browser → log in with your subscription
+cd containers/autoquant
 
-# 2. Launch the agent
-docker compose run autoresearch agent
-#    Agent reads program.md, starts experiment loop, runs indefinitely
+# Launch agent — cpu-ta
+docker compose -p cpu-ta --env-file ../../experiments/cpu-ta/.env run -d autoquant agent
+
+# Launch agent — gpu-ta (simultaneously)
+docker compose -p gpu-ta --env-file ../../experiments/gpu-ta/.env run -d autoquant agent
+
+# Single backtest
+docker compose -p cpu-ta --env-file ../../experiments/cpu-ta/.env run autoquant strategy.py
+
+# Status per experiment
+docker compose -p cpu-ta ps
+docker compose -p gpu-ta ps
+
+# Stop specific experiment
+docker compose -p gpu-ta down
 ```
 
-### Monitoring progress
+> **Note:** Market data (`data/`) is shared between all experiments and downloaded once on first run. Subsequent runs (even switching experiments) skip the download.
 
-While the agent is running, open a second terminal:
+## Live signals
+
+`live_signals.py` (cpu-ta only) loads the current best strategy from git, generates LONG/SHORT/FLAT signals for SPY, BTC, ETH, and sends Telegram notifications. Run it on a cron or manually:
 
 ```bash
-# Find the running container
-docker ps
-# CONTAINER ID   IMAGE                              STATUS
-# a1b2c3d4e5f6   autoresearch-autoresearch          Up 2 hours
-
-# --- Results table (main overview) ---
-docker exec -it <container_id> cat results.tsv
-# commit   val_bpb    memory_gb  status   description
-# baseline 1.104000   6.2        keep     baseline DEPTH=8 10min
-# a1b2c3d  1.098500   6.3        keep     increase MATRIX_LR to 0.06
-# b2c3d4e  1.102000   6.2        discard  switch to GeLU activation
-# ...
-
-# --- Live training output ---
-docker exec -it <container_id> tail -f run.log
-# step 00234 (43.2%) | loss: 3.15 | lrm: 1.00 | ...
-
-# --- Git log (kept experiments) ---
-docker exec -it <container_id> git log --oneline
-# b2c3d4e increase MATRIX_LR to 0.06
-# a1b2c3d baseline val_bpb=1.104
-
-# --- GPU utilization ---
-nvidia-smi
-
-# --- Current train.py diff vs baseline ---
-docker exec -it <container_id> git diff HEAD~1
-
-# --- Quick summary: best result so far ---
-docker exec -it <container_id> sort -t$'\t' -k2 -n results.tsv | head -3
+# Run once — refresh data, emit signals, notify on changes
+docker compose -p cpu-ta --env-file ../../experiments/cpu-ta/.env run autoquant live
 ```
 
-### Stopping and resuming
+What it does each run:
+- Refreshes market data (re-downloads only if stale)
+- Loads best `strategy.py` commit from `results.tsv`
+- Detects signal changes → Telegram alert
+- Sends daily summary (once per day)
+- Tracks open signals and verifies them after `VERIFY_DAYS` days (default 7) — reports ✅/❌ vs entry price
+
+State is persisted in `~/.cache/autoquant/live_signals_state.json` inside the container (bind-mount or named volume to persist across runs).
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `VERIFY_DAYS` | `7` | Days after signal to check outcome |
+| `REPO_DIR` | auto-detected | Override repo path (useful if running outside container) |
+
+## Monitoring
 
 ```bash
-# Stop: Ctrl+C or from another terminal:
-docker stop <container_id>
+# Live agent output (Ctrl+C to detach, container keeps running)
+docker compose -p cpu-ta logs -f
 
-# Resume: agent picks up from last git state
-docker compose run autoresearch agent
+# Restart a hung claude without killing the container (loop auto-restarts in 5s)
+docker compose -p cpu-ta exec autoquant kill $(cat /tmp/claude.pid)
+# Claude also auto-kills itself after 20min if hung
+
+# Results table
+docker compose -p gpu-ta exec autoquant cat results.tsv
+
+# Best score so far
+docker compose -p gpu-ta exec autoquant sort -t$'\t' -k2 -rn results.tsv | head -3
+
+# Live backtest output
+docker compose -p gpu-ta exec autoquant tail -f run.log
+
+# Git log (all experiments)
+docker compose -p gpu-ta exec autoquant git log --oneline
 ```
 
-The git history and results.tsv persist inside the container. Claude auth persists in the `claude-config` Docker volume.
+## Adding a new experiment
 
-## Adapting for other GPUs
+1. Copy an existing experiment folder: `cp -r experiments/cpu-ta experiments/my-strategy`
+2. Edit `strategy.py`, `prepare.py`, `program.md` as needed
+3. Run: `EXPERIMENT=my-strategy docker compose -f containers/autoquant/docker-compose.yml run autoquant agent`
 
-Adjust these parameters in `train.py` based on available VRAM:
+No image rebuild needed — experiment files are mounted at runtime.
 
-- **24GB (RTX 4090):** `DEVICE_BATCH_SIZE=64`, `DEPTH=10`
-- **16GB (RTX 4080):** `DEVICE_BATCH_SIZE=48`, `DEPTH=8`
-- **12GB (RTX 5070/4070):** current defaults
-- **8GB (RTX 4060):** `DEVICE_BATCH_SIZE=16`, `DEPTH=4`
+## How it works
 
-If OOM: lower `DEVICE_BATCH_SIZE` first, then `DEPTH`.
+1. Agent reads `results.tsv`, finds best score + commit
+2. If last was discard: restores best `strategy.py` from git
+3. Modifies `strategy.py` with new idea
+4. Commits, runs backtest (~30-60s)
+5. Extracts metrics, appends to `results.tsv`
+6. Keeps or discards (no git reset — linear history)
+7. Pushes to remote, sends Telegram notification
+8. Repeats forever
 
 ## License
 
-MIT (same as upstream)
+MIT
