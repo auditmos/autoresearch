@@ -8,5 +8,7 @@ run.log
 *.pkl
 .cache/
 worktrees/
-data/
+data/*
+!data/.gitkeep
 .env
+experiments/*/.env

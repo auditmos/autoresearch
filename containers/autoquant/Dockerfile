@@ -5,14 +5,14 @@ ENV PYTHONUNBUFFERED=1
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl ca-certificates bash tmux \
+    git curl ca-certificates bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user (required by claude --dangerously-skip-permissions)
 RUN useradd -m -s /bin/bash researcher
 
-# uv for researcher
-RUN su - researcher -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+# uv for researcher — pre-create share/uv so named volume inherits researcher ownership
+RUN su - researcher -c 'curl -LsSf https://astral.sh/uv/install.sh | sh && mkdir -p /home/researcher/.local/share/uv'
 
 WORKDIR /app
 RUN chown researcher:researcher /app
@@ -20,12 +20,8 @@ RUN chown researcher:researcher /app
 USER researcher
 ENV PATH="/home/researcher/.local/bin:$PATH"
 
-# Project files + install deps as researcher (symlinks point to researcher's Python)
-COPY --chown=researcher:researcher pyproject.toml .python-version ./
-RUN uv sync
-
-# Application code (changes more often → separate layer)
-COPY --chown=researcher:researcher prepare.py strategy.py program.md notify.sh ./
+# Support files (same for all experiments — experiment files mounted at /experiment)
+COPY --chown=researcher:researcher notify.sh ./
 COPY --chown=researcher:researcher hooks/ ./hooks/
 RUN chmod +x notify.sh
 

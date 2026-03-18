@@ -97,7 +97,25 @@ cp /app/hooks/post-commit /app/.git/hooks/post-commit
 chmod +x /app/.git/hooks/pre-commit /app/.git/hooks/post-commit
 ```
 
-### 7. Named volume for Claude config
+### 7. Never use named volumes for uv cache
+
+Named volume roots are always created as `root:root` by Docker, regardless of image directory ownership. Entrypoint `chown` does not reliably fix this.
+
+**Don't do this:**
+```yaml
+volumes:
+  - uv-cache:/home/researcher/.local/share/uv  # root-owned root dir → permission denied
+```
+
+**Do this instead:** omit the volume entirely. uv re-downloads packages on fresh container (~30s) — acceptable for long-running agents.
+
+If caching is critical, use a **bind mount** to a host directory where you control permissions:
+```yaml
+volumes:
+  - ./uv-cache:/home/researcher/.local/share/uv  # host dir — set perms on host
+```
+
+### 8. Named volume for Claude config
 
 Persist Claude auth across container recreations:
 ```yaml

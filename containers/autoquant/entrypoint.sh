@@ -104,8 +104,13 @@ if [ "$1" = "agent" ]; then
             SCORES=$(tail -n 5 results.tsv | awk -F'\t' '{print $2}' | sort -u)
             [ "$(echo "$SCORES" | wc -l)" = "1" ] && STUCK="You are stuck — last 5 experiments all scored the same. STOP fine-tuning parameters. Try a completely different approach: new indicator family, different signal logic, or restructure the strategy entirely."
         fi
-        claude -p --dangerously-skip-permissions $MODEL_FLAG \
-            "Read program.md, check results.tsv for best score and last experiment, run next experiment. $STUCK NEVER STOP."
+        # Run in background so kill $CLAUDE_PID doesn't kill the loop
+        # timeout 1200s kills hung claude after 20min
+        timeout 1200 claude -p --dangerously-skip-permissions $MODEL_FLAG \
+            "Read program.md, check results.tsv for best score and last experiment, run next experiment. $STUCK NEVER STOP." &
+        CLAUDE_PID=$!
+        echo $CLAUDE_PID > /tmp/claude.pid
+        wait $CLAUDE_PID || true
         echo "=== Claude exited, restarting in 5s ==="
         sleep 5
     done
