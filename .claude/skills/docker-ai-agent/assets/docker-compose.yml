@@ -1,0 +1,37 @@
+services:
+  your-service:
+    build: .
+    # Remove runtime/deploy blocks if no GPU needed
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
+      # Add your app-specific env vars here:
+      - YOUR_API_KEY=${YOUR_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      # For git state persistence across restarts:
+      - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
+      # Optional: override Claude model
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-}
+    volumes:
+      # Bind mount for data (entrypoint fixes permissions at startup)
+      - ./data:/home/researcher/.cache/yourapp/data
+      # Named volume for Claude auth — persists across container recreations
+      - claude-config:/home/researcher/.claude
+    stdin_open: true
+    tty: true
+    # Usage:
+    #   docker compose run your-service login    # authenticate claude (one-time, outside tmux)
+    #   docker compose run your-service agent    # autonomous agent mode
+    #   docker compose run your-service main.py  # single run
+
+volumes:
+  claude-config:
