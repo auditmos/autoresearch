@@ -12,3 +12,4 @@ data/*
 !data/.gitkeep
 .env
 experiments/*/.env
+.claude/projects/*
