@@ -7,12 +7,15 @@ Best score: **1.4155** (#70, #73-76)
 
 ## Dane
 
-- **Asset:** BTC/USDT daily (ccxt Binance, 1H → resample)
+- **Asset:** BTC/USDT daily (ccxt Binance, 1H → resample to daily)
+- **Zakres danych:** 2021-06-01 → 2026-03-19 (1753 dni total)
+- **Cena BTC:** $36,693 (start) → $70,442 (koniec)
 - **Train:** 2022-01-01 → 2025-06-30 (1277 dni)
 - **Val:** 2025-07-01 → 2026-03-19 (262 dni)
-- **On-chain (bitcoin-data.com, Tier 1):** MVRV, MVRV_STH, MVRV_LTH, SOPR_STH, exchange_netflow, NUPL, fear_greed, active_addresses
-- **Macro (FRED):** WALCL, DFF, T10Y2Y, VIXCLS, DGS10, BAMLH0A0HYM2, DTWEXBGS
-- **Inne:** BTC funding rate (Binance Futures, daily avg), FOMC calendar (hardcoded dates 2022-2026)
+- **On-chain (bitcoin-data.com, Tier 1, 8 metryk):** MVRV (5191 pkt), MVRV_STH (4824), MVRV_LTH (5532), SOPR_STH (5692), exchange_netflow (5099), NUPL (4824), fear_greed (2932), active_addresses (6275)
+- **Macro (FRED, 7 serii):** WALCL (271 pkt, weekly), DFF (1902, daily), T10Y2Y (1301), VIXCLS (1335), DGS10 (1300), BAMLH0A0HYM2 (1362), DTWEXBGS (1298)
+- **Funding rate:** Binance Futures, daily avg (1904 dni)
+- **FOMC calendar:** 34 dni FOMC w zakresie danych (hardcoded 2022-2026)
 - **Features:** ~40 (price TA + on-chain z 5d change + FRED z 5d change + funding rate + FOMC proximity) — rolling z-score normalizacja
 
 ## Architektura
