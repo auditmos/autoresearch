@@ -14,9 +14,12 @@ services:
       - NVIDIA_VISIBLE_DEVICES=0
       - CUDA_VISIBLE_DEVICES=0
       - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      - FRED_API_KEY=${FRED_API_KEY:-}
+      - BITCOIN_DATA_API_KEY=${BITCOIN_DATA_API_KEY:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
+      - GIT_BRANCH=${GIT_BRANCH:-}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-}
       - SYNC_INTERVAL=${SYNC_INTERVAL:-300}
     volumes:
@@ -33,3 +36,4 @@ services:
 volumes:
   autoquant-cpu-ta-claude:
   autoquant-gpu-ta-claude:
+  autoquant-btc-daily-claude:

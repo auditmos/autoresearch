@@ -63,17 +63,32 @@ if [ "$1" = "agent" ]; then
     git config --global user.name "researcher"
 
     if [ ! -d .git ]; then
+        BRANCH_FLAG=""
+        [ -n "$GIT_BRANCH" ] && BRANCH_FLAG="-b $GIT_BRANCH"
+        CLONED=false
         # Try to clone from remote (resume previous experiments)
-        if [ -n "$GIT_REMOTE_URL" ] && git clone "$GIT_REMOTE_URL" /tmp/repo 2>/dev/null; then
-            cp -a /tmp/repo/.git /app/.git
-            # Restore state from remote
-            git checkout HEAD -- strategy.py 2>/dev/null || true
-            git checkout HEAD -- strategy_best.py 2>/dev/null || true
-            git checkout HEAD -- results.tsv 2>/dev/null || true
+        if [ -n "$GIT_REMOTE_URL" ] && git clone $BRANCH_FLAG "$GIT_REMOTE_URL" /tmp/repo 2>/dev/null; then
+            # Check if repo has commits (not empty)
+            if git -C /tmp/repo rev-parse HEAD >/dev/null 2>&1; then
+                cp -a /tmp/repo/.git /app/.git
+                [ -n "$GIT_BRANCH" ] && git checkout "$GIT_BRANCH" 2>/dev/null || true
+                git checkout HEAD -- strategy.py 2>/dev/null || true
+                git checkout HEAD -- strategy_best.py 2>/dev/null || true
+                git checkout HEAD -- results.tsv 2>/dev/null || true
+                CLONED=true
+                echo "=== Resumed from remote (branch: ${GIT_BRANCH:-default}) ==="
+            fi
             rm -rf /tmp/repo
-            echo "=== Resumed from remote ==="
-        else
-            git init && git add -A && git commit -m "autoquant baseline"
+        fi
+        if [ "$CLONED" = "false" ]; then
+            git init
+            [ -n "$GIT_BRANCH" ] && git checkout -b "$GIT_BRANCH"
+            git add -A && git commit -m "autoquant baseline"
+            # Push initial commit to empty remote
+            if [ -n "$GIT_REMOTE_URL" ]; then
+                git remote add origin "$GIT_REMOTE_URL" 2>/dev/null || true
+                git push -u origin HEAD 2>/dev/null && echo "=== Pushed initial commit ===" || true
+            fi
         fi
     fi
 

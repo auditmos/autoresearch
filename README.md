@@ -26,16 +26,24 @@ autoresearch/
 │   │   ├── pyproject.toml
 │   │   ├── .python-version
 │   │   └── .env            # gitignored — keys + GIT_REMOTE_URL for this experiment
-│   └── gpu-ta/             # GPU strategies (LSTM, PyTorch, CUDA)
+│   ├── gpu-ta/             # GPU strategies (LSTM, PyTorch, CUDA)
+│   │   ├── strategy.py
+│   │   ├── prepare.py
+│   │   ├── program.md
+│   │   ├── pyproject.toml
+│   │   ├── .python-version
+│   │   └── .env            # gitignored — keys + GIT_REMOTE_URL for this experiment
+│   └── btc-daily/          # BTC-only daily swing (LSTM + on-chain + FRED macro + FOMC)
 │       ├── strategy.py
 │       ├── prepare.py
 │       ├── program.md
 │       ├── pyproject.toml
 │       ├── .python-version
-│       └── .env            # gitignored — keys + GIT_REMOTE_URL for this experiment
+│       ├── EXPERIMENT_NOTES.md  # v1 results: 80 experiments, best score 1.4155
+│       └── .env            # gitignored — keys (AV + FRED + bitcoin-data.com)
 │
-├── data/                   # shared market data (SPY, BTC, ETH) — gitignored
-│                           # downloaded once from Alpha Vantage, reused by all experiments
+├── data/                   # shared market data — gitignored
+│                           # downloaded once, reused by all experiments
 └── README.md
 ```
 
@@ -60,6 +68,8 @@ autoresearch/
 - Docker
 - Claude subscription
 - Alpha Vantage API key (premium recommended)
+- FRED API key (free, for btc-daily macro data)
+- bitcoin-data.com API key (for btc-daily on-chain data)
 
 ## Secrets setup
 

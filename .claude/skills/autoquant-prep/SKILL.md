@@ -90,7 +90,7 @@ Sharpe ~X.XX, MaxDD ~-XX%, val <period>.
 - Output format (grep-parseable): `score:`, `sharpe:`, `sortino:`, `max_drawdown:`, `total_return:`, `win_rate:`, `num_trades:`, `consistency:`
 - Splits: train 2019-01→2023-06, val 2023-07→2025-06, holdout 2025-07+
 - Score: `(0.4*sharpe + 0.2*sortino + 0.2*(1+max_dd) + 0.1*return + 0.1*win_rate) * trade_penalty * consistency`
-- Assets: SPY, BTC, ETH via Alpha Vantage — cache as parquet in `~/.cache/autoquant/data/`
+- Assets from Alpha Vantage — cache as parquet in `~/.cache/autoquant/data/`
 
 ## strategy.py specs
 
@@ -103,7 +103,8 @@ Sharpe ~X.XX, MaxDD ~-XX%, val <period>.
 | Name | Best score | Description |
 |------|------------|-------------|
 | `cpu-ta` | 0.786 | Daily SPY+BTC+ETH, CPU TA, long-only, ADX+BB |
-| `gpu-ta`  | 0.408 | 1H multi-crypto, LSTM PyTorch GPU |
+| `gpu-ta`  | 1.903 | 1H multi-crypto, LSTM PyTorch GPU, per-asset ensemble |
+| `btc-daily` | TBD | Daily BTC-only, LSTM+on-chain+FRED+FOMC, R:R 1:3 focus |
 
 ## Checklist
 
