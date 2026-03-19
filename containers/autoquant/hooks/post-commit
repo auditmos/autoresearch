@@ -1,7 +1,0 @@
-#!/bin/bash
-git push origin HEAD 2>/dev/null || true
-SCORE=$(grep "^score:" /app/run.log | awk "{print \$2}")
-DESC=$(git log -1 --pretty=%s)
-./notify.sh "<b>Autoquant</b>
-Score: $SCORE
-Desc: $DESC" 2>/dev/null || true

@@ -40,18 +40,16 @@ The most important file — quality here determines agent behavior. Use this str
 
 LOOP FOREVER:
 
-1. Read `results.tsv`. Find best score + commit hash (`best_commit`).
-2. If last was `discard`: restore: `git show <best_commit>:strategy.py > strategy.py`
+1. Read `results.tsv`. Find best score + last experiment number.
+2. If last was `discard`: `cp strategy_best.py strategy.py`
 3. Modify `strategy.py` with new idea.
-4. `git add strategy.py results.tsv && git commit -m "<short desc>"`
-5. Run: `uv run strategy.py > run.log 2>&1` (timeout: 2 min)
-6. Check: `grep "^score:\|^sharpe:\|^max_drawdown:" run.log`
+4. Run: `uv run strategy.py > run.log 2>&1` (timeout: 2 min)
+5. Check: `grep "^score:\|^sharpe:\|^max_drawdown:" run.log`
    Empty = crash → `tail -n 50 run.log`, fix, retry max 2x then move on.
-7. Append to `results.tsv`: `<commit>\t<score>\t<sharpe>\t<max_dd>\t<status>\t<desc>`
-8. score > best → keep | score ≤ best → discard (no git reset)
-9. `git push origin HEAD 2>/dev/null || echo "push failed, continuing"`
-10. `./notify.sh "<b>Autoquant #N</b>\nStatus: keep/discard\nScore: X.XXX\nDesc: <desc>"`
-11. GOTO 1
+6. Append to `results.tsv`: `<exp>\t<score>\t<sharpe>\t<max_dd>\t<status>\t<desc>`
+7. score > best → keep + `cp strategy.py strategy_best.py` | score ≤ best → discard
+8. `./notify.sh "<b>Autoquant #N</b>\nStatus: keep/discard\nScore: X.XXX\nDesc: <desc>"`
+9. GOTO 1
 
 ## Current state
 

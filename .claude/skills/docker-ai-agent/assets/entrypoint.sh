@@ -26,12 +26,6 @@ if [ "$1" = "agent" ]; then
     git config --global user.email "agent@yourapp"
     git config --global user.name "agent"
 
-    # PATTERN: git hooks > agent instructions — agents ignore file-based git instructions
-    # Pre-commit: auto-stage files; post-commit: auto-push + notify
-    cp /app/hooks/pre-commit /app/.git/hooks/pre-commit 2>/dev/null || true
-    cp /app/hooks/post-commit /app/.git/hooks/post-commit 2>/dev/null || true
-    chmod +x /app/.git/hooks/pre-commit /app/.git/hooks/post-commit 2>/dev/null || true
-
     # PATTERN: Persist git state across container restarts via remote clone
     # /app is not a volume — state is lost on container stop without this
     if [ ! -d .git ]; then
@@ -50,6 +44,9 @@ if [ "$1" = "agent" ]; then
         git remote remove origin 2>/dev/null || true
         git remote add origin "$GIT_REMOTE_URL"
     fi
+
+    # PATTERN: Background sync — periodic git add/commit/push
+    [ -d .git ] && ./sync.sh &
 
     # PATTERN: Claude -p with while loop
     # -p (non-interactive) exits after prompt — wrap in loop to auto-restart

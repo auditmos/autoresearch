@@ -34,7 +34,7 @@ if [ "$1" = "live" ]; then
     git config --global --add safe.directory /app
     # Clone from remote to get results.tsv + full git history
     if [ -n "$GIT_REMOTE_URL" ]; then
-        git clone --branch autoquant/experiment --depth=200 "$GIT_REMOTE_URL" /tmp/live-repo 2>/dev/null \
+        git clone --depth=200 "$GIT_REMOTE_URL" /tmp/live-repo 2>/dev/null \
             && export REPO_DIR=/tmp/live-repo \
             && echo "=== Loaded repo from $GIT_REMOTE_URL ===" \
             || echo "Warning: git clone failed, REPO_DIR not set"
@@ -66,22 +66,19 @@ if [ "$1" = "agent" ]; then
         # Try to clone from remote (resume previous experiments)
         if [ -n "$GIT_REMOTE_URL" ] && git clone "$GIT_REMOTE_URL" /tmp/repo 2>/dev/null; then
             cp -a /tmp/repo/.git /app/.git
-            git checkout autoquant/experiment 2>/dev/null || true
-            # Restore strategy.py + results.tsv from remote
+            # Restore state from remote
             git checkout HEAD -- strategy.py 2>/dev/null || true
+            git checkout HEAD -- strategy_best.py 2>/dev/null || true
             git checkout HEAD -- results.tsv 2>/dev/null || true
             rm -rf /tmp/repo
             echo "=== Resumed from remote ==="
         else
             git init && git add -A && git commit -m "autoquant baseline"
-            git checkout -b autoquant/experiment
         fi
     fi
 
-    # Install hooks AFTER git dir is fully set up (clone overwrites .git/hooks)
-    cp /app/hooks/pre-commit /app/.git/hooks/pre-commit 2>/dev/null || true
-    cp /app/hooks/post-commit /app/.git/hooks/post-commit 2>/dev/null || true
-    chmod +x /app/.git/hooks/pre-commit /app/.git/hooks/post-commit 2>/dev/null || true
+    # Ensure strategy_best.py exists
+    [ ! -f strategy_best.py ] && cp strategy.py strategy_best.py
 
     # Set remote if provided
     if [ -n "$GIT_REMOTE_URL" ]; then
@@ -91,8 +88,11 @@ if [ "$1" = "agent" ]; then
 
     # Results tracking
     if [ ! -f results.tsv ]; then
-        printf 'commit\tscore\tsharpe\tmax_dd\tstatus\tdescription\n' > results.tsv
+        printf 'exp\tscore\tsharpe\tmax_dd\tstatus\tdescription\n' > results.tsv
     fi
+
+    # Background git sync
+    [ -d .git ] && ./sync.sh &
 
     # Launch claude in loop (-p exits when done, shell restarts it)
     MODEL_FLAG=""

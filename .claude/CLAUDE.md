@@ -2,7 +2,7 @@
 
 ## What this is
 
-Autonomous agent loop: modify `strategy.py`, backtest on SPY+BTC+ETH daily data, evaluate `score` (higher=better), keep improvements, discard regressions. All commits kept + pushed for transparency.
+Autonomous agent loop: modify `strategy.py`, backtest on SPY+BTC+ETH daily data, evaluate `score` (higher=better), keep improvements, discard regressions. Background sync.sh handles git commits + pushes.
 
 ## Hardware
 
@@ -17,11 +17,11 @@ Autonomous agent loop: modify `strategy.py`, backtest on SPY+BTC+ETH daily data,
 - **Run command:** `uv run strategy.py > run.log 2>&1`
 - **Timeout:** kill if >2 min
 - **Crash:** `tail -n 50 run.log`, attempt fix, move on after 2-3 tries
-- **Keep:** score improved → keep, advance best_commit
-- **Discard:** score equal/worse → discard (NO git reset, restore best strategy.py)
-- **Log:** append to `results.tsv`: `commit | score | sharpe | max_dd | status | description`
-- **Push:** `git push origin HEAD` after every experiment
+- **Keep:** score improved → `cp strategy.py strategy_best.py`
+- **Discard:** score equal/worse → `cp strategy_best.py strategy.py`
+- **Log:** append to `results.tsv`: `exp | score | sharpe | max_dd | status | description`
 - **Notify:** `./notify.sh "<html>"` after every experiment
+- **Do NOT use git commands** — background sync handles persistence
 - **NEVER STOP** — run indefinitely until manually interrupted
 
 ## Data

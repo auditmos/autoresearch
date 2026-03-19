@@ -22,8 +22,8 @@ ENV PATH="/home/researcher/.local/bin:$PATH"
 
 # Support files (same for all experiments — experiment files mounted at /experiment)
 COPY --chown=researcher:researcher notify.sh ./
-COPY --chown=researcher:researcher hooks/ ./hooks/
-RUN chmod +x notify.sh
+COPY --chown=researcher:researcher sync.sh ./
+RUN chmod +x notify.sh sync.sh
 
 # Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash 2>/dev/null || true

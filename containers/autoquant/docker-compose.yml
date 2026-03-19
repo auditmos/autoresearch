@@ -18,6 +18,7 @@ services:
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-}
+      - SYNC_INTERVAL=${SYNC_INTERVAL:-300}
     volumes:
       - ../../experiments/${EXPERIMENT:-cpu-ta}:/experiment:ro
       - ../../data:/home/researcher/.cache/autoquant/data

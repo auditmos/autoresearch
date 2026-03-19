@@ -22,8 +22,8 @@ Po każdej modyfikacji uruchom `python3 strategy.py` i sprawdź wynik.
 3. Zmodyfikuj `strategy.py`
 4. Uruchom: `uv run strategy.py`
 5. Sprawdź `score:` w outputcie
-6. Jeśli score lepszy niż poprzedni najlepszy → zachowaj, idź do kroku 2
-7. Jeśli score gorszy → cofnij zmiany (`git checkout strategy.py`), idź do kroku 2
+6. Jeśli score lepszy niż poprzedni najlepszy → `cp strategy.py strategy_best.py`, idź do kroku 2
+7. Jeśli score gorszy → `cp strategy_best.py strategy.py`, idź do kroku 2
 8. Powtarzaj w nieskończoność
 
 ## Obecny baseline (po Fazie 1 — 43 eksperymenty)

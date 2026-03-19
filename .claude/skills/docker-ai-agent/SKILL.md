@@ -5,7 +5,7 @@ description: >
   Claude Code (or similar AI agents) autonomously in containers. Encodes battle-tested patterns for:
   non-root user setup with uv/Python, bind-mount permission fixing, Claude non-interactive (-p) mode
   with while-loop restart, git state persistence via remote clone, git safe.directory config, and
-  hooks-based automation (pre/post-commit). Use when building a Docker container to run Claude or
+  background sync (periodic git add/commit/push). Use when building a Docker container to run Claude or
   another AI agent autonomously, or when setting up claude-in-docker infrastructure.
 ---
 
@@ -84,17 +84,25 @@ if [ ! -d .git ]; then
 fi
 ```
 
-### 6. Automation via git hooks, not agent instructions
+### 6. Background sync instead of agent git commands
 
-Agents reliably ignore file-based instructions for git operations. Use hooks instead:
-- **pre-commit**: auto-stage files the agent forgets (`git add results.tsv`)
-- **post-commit**: auto-push + notify (`git push origin HEAD && ./notify.sh`)
+Agents unreliably follow git instructions. Use a background sync script instead:
 
-Copy hooks in entrypoint (not Dockerfile — hooks dir may change):
 ```bash
-cp /app/hooks/pre-commit /app/.git/hooks/pre-commit
-cp /app/hooks/post-commit /app/.git/hooks/post-commit
-chmod +x /app/.git/hooks/pre-commit /app/.git/hooks/post-commit
+# sync.sh — runs in background, periodically commits + pushes
+INTERVAL="${SYNC_INTERVAL:-300}"
+while true; do
+    sleep "$INTERVAL"
+    [ ! -d .git ] && continue
+    git add -A && git diff --cached --quiet && continue
+    git commit -m "sync $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+    git push origin HEAD || true
+done
+```
+
+Launch in entrypoint before claude loop:
+```bash
+[ -d .git ] && ./sync.sh &
 ```
 
 ### 7. Never use named volumes for uv cache
